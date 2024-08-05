@@ -1,0 +1,53 @@
+services:
+  db:
+    image:  postgres:16.3-bookworm
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpassword
+      - POSTGRES_DB=jobly
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      # This thing initializes the DB automatically, it's wonderful
+      - ./db_init_files:/docker-entrypoint-initdb.d
+    ports:
+      # We map the default PG port to something that is probably not taken
+      - 15432:5432
+    healthcheck:
+      test: pg_isready -U pguser -d jobly
+  test_db:
+    image:  postgres:16.3-bookworm
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpassword
+      - POSTGRES_DB=jobly
+    volumes:
+      - /var/lib/postgresql/data
+      # This thing initializes the DB automatically, it's wonderful
+      - ./db_init_files:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: pg_isready -U pguser -d jobly
+            
+  web:
+    build: .
+    ports:
+      - 3000:3000
+      - 3001:3001
+    environment:
+      - DATABASE_URL=postgres://pguser:pgpassword@db/jobly
+      - TEST_DATABASE_URL=postgres://pguser:pgpassword@test_db/jobly
+    depends_on:
+      db:
+        condition: service_healthy
+      test_db:
+        condition: service_healthy
+    command: npm run dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+
+  # # Adminer is here just to make my life easier when I need to see the DB
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
